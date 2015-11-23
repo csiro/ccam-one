@@ -1,0 +1,965 @@
+      program one
+
+      use netcdf_m
+
+      use ccinterp
+      use cll_m
+      use latlong_m
+      use sigdata_m
+
+      character*80 inf,zsfil,ofile
+
+      common/mapproj/du,tanl,rnml,stl1,stl2
+
+!     include 'netcdf.inc'
+
+      parameter ( pi=3.1415926536 )
+      parameter ( g=9.80616 )
+      
+      include 'cdfind.h'
+
+      integer  il,jl,kl,ifull,ix,iy
+      integer, dimension(2) :: ccdim
+
+      common/lconther/ther
+      logical sdiag
+
+      real dst
+      real, dimension(2) :: lonlat
+      real, dimension(:,:,:), allocatable :: rlld,xyz,axyz,bxyz      
+      real, dimension(:,:), allocatable :: grid
+      real, dimension(:), allocatable :: ax,ay,az,bx,by,bz,x,y,z
+      real, dimension(:), allocatable :: datan
+      logical, dimension(:), allocatable :: lsm_gbl
+      real, dimension(:), allocatable :: glon, glat
+
+      real, dimension(:), allocatable :: var_m
+      real, dimension(:), allocatable :: lsmg_m
+      real, dimension(:), allocatable :: zsg
+
+      common/datatype/in_type
+      character*1 in_type
+
+      logical olsm_gbl
+      character*80 timorg
+      character*80 namein,nameout,varun
+      character*80 cu
+      character*3 cmonth
+      character*10 header
+      real addoff, sfactor, datmax,datmin
+
+      namelist/gnml/inf,ofile,ds,du,tanl,rnml,stl1,stl2,inzs,zsfil
+     &             ,io_out,igd,jgd,id,jd,sarch,ntimes
+     &             ,namein,nameout,varun
+     &     ,in,calout,sdiag,nsmooth,slon,slat
+     &     ,ids,ide,jds,jde
+     &     ,iccs,icce,jccs,jcce,ifill
+     &     ,addoff,sfactor,maxit
+     &     ,datmax,datmin
+
+      data igd/1/,jgd/1/,id/1/,jd/1/
+      data io_out/3/
+      data ifill/3/
+      data nsmooth/20/
+      data namein/'tos'/,varun/'K'/
+      data nameout/'tos'/
+      data inzs/10/, in/50/
+      data sarch/1/,ntimes/999999/
+      data debug/.false./,calout/.true./
+      data sdiag/.false./
+      data ids/1085/,ide/1100/,jds/520/,jde/590/
+!     data iccs/100/,icce/129/,jccs/760/,jcce/700/ ! west asia
+      data iccs/1/,icce/20/,jccs/1090/,jcce/1040/ ! southern GL
+      data addoff/-9.e29/,sfactor/-9.e29/,maxit/-1/
+      data datmax/400.0/,datmin/270.0/
+
+      save
+   
+      slon=0.
+      slat=90.
+
+!####################### read namelists ############################
+      write(6,*)'read namelist'
+      read (5, gnml)
+      write(6,nml=gnml)
+! read and write namelist input for vidar
+!     open  ( 98, file='vidar.nml',status='unknown' )
+!     read  ( 98, nml=vi )
+!     write ( unit=6, nml=vi)
+!####################### read namelist ############################
+
+!####################### read topography data ############################
+      write(6,*)'open ',inzs,' zsfil=',zsfil
+
+        write(6,*)"set up cc geometry"
+        open(unit=inzs,file=zsfil,status='old',form='formatted')
+!       read(inzs,'(i3,i4,2f6.1,f5.2,f9.0,a47)')
+!    &          ilx,jlx,rlong0,rlat0,schmidt,ds,header
+        read(inzs,*)ilx,jlx,rlong0,rlat0,schmidt,ds,header
+        du=rlong0
+        tanl=rlat0
+        rnml=schmidt
+        write(6,*)"gbl mapproj=",ilx,jlx,rlong0,rlat0,schmidt,ds
+!        if(ilx.ne.il.or.jlx.ne.jl)
+!     &     stop 'wrong topo file supplied (il,jl) for one'
+
+        il=ilx
+        jl=6*il
+        ifull=il*jl
+
+        iccs=min(il,iccs)
+        jccs=min(jl,jccs)
+        icce=min(il,icce)
+        jcce=min(jl,jcce)
+
+        call latlongalloc(il)
+        call cllalloc(il)
+        call sigdataalloc(il)
+
+        allocate(var_m(ifull),lsmg_m(ifull))
+        allocate(zsg(ifull))
+        allocate(x(ifull),y(ifull),z(ifull))
+        allocate(ax(ifull),ay(ifull),az(ifull))
+        allocate(bx(ifull),by(ifull),bz(ifull))
+        
+        ! set-up CC grid
+        ccdim(1)=il
+        ccdim(2)=jl
+        lonlat(1)=rlong0
+        lonlat(2)=rlat0
+        allocate(rlld(ccdim(1),ccdim(2),2),grid(ccdim(1),ccdim(2)))
+        allocate(xyz(ccdim(1),ccdim(2),3),axyz(ccdim(1),ccdim(2),3))
+        allocate(bxyz(ccdim(1),ccdim(2),3))        
+        Call getcc(rlld,grid,xyz,axyz,bxyz,ccdim,lonlat,schmidt,dst)
+        write(6,*)"dst=",dst
+        do i=1,ccdim(1)
+          do j=1,ccdim(2)
+            iq=i+(j-1)*ccdim(1)
+            rlong(iq)=rlld(i,j,1)
+            rlat(iq)=rlld(i,j,2)
+            x(iq)=xyz(i,j,1)
+            y(iq)=xyz(i,j,2)
+            z(iq)=xyz(i,j,3)
+            ax(iq)=axyz(i,j,1)
+            ay(iq)=axyz(i,j,2)
+            az(iq)=axyz(i,j,3)
+            bx(iq)=bxyz(i,j,1)
+            by(iq)=bxyz(i,j,2)
+            bz(iq)=bxyz(i,j,3)
+          end do
+        end do
+        deallocate(xyz,axyz,bxyz)
+        deallocate (rlld,grid)
+        !call setxyz
+
+        rlatx=-1.e29
+        rlatn= 1.e29
+        rlonx=-1.e29
+        rlonn= 1.e29
+
+        do iq=1,ifull
+
+c       convert conformal cubic lats & longs to degrees (-90 to 90) & (0 to 360)
+c       used in sintp16; N.B. original rlong is -pi to pi
+          !rlat(iq)=rlat(iq)*180./pi
+          !rlong(iq)=rlong(iq)*180./pi
+          if(rlong(iq).lt.0.)rlong(iq)=rlong(iq)+360.
+          if(rlat(iq).gt.rlatx)then
+            rlatx=rlat(iq)
+            ilatx=iq
+          endif
+          if(rlong(iq).gt.rlonx)then
+            rlonx=rlong(iq)
+            ilonx=iq
+          endif
+          if(rlat(iq).lt.rlatn)then
+            rlatn=rlat(iq)
+            ilatn=iq
+          endif
+          if(rlong(iq).lt.rlonn)then
+            rlonn=rlong(iq)
+            ilonn=iq
+          endif
+
+        enddo  ! iq loop
+
+        write(6,*)"rlong,rlat(1,1)=",rlong(1),rlat(1)
+        write(6,*)"rlong:x,n=",rlonx,ilonx,rlonn,ilonn
+        write(6,*)"rlatg:x,n=",rlatx,ilatx,rlatn,ilatn
+
+      write(6,*)'read model grid zsg = g*zs'
+      read(inzs,*)zsi_m
+
+      write(6,*)'convert g*zs to zs(m)'
+      do iq=1,ifull
+        zs(iq)=zsi_m(iq)/g ! convert ascii read in zs*g to zs(m)
+      enddo !iq=1,ifull
+
+      write(6,*)'read model grid land-sea mask (0=ocean, 1=land)'
+      read(inzs,*)lsm_m
+      close(inzs)
+
+      ijd=id+il*(jd-1)
+      write(6,*)"ijd=",ijd," zs(m)=",zs(ijd)," lsm_m=",lsm_m(ijd)
+!####################### read topography data ############################
+
+!####################### open input netcdf file ############################
+      write(6,*)'inf='
+      write(6,*)inf
+      idnci = ncopn(inf,ncnowrit,ier)
+      write(6,*)'idnci=',idnci
+      if(ier.ne.0) then
+        write(6,*)' cannot open netCDF file; error code ',ier
+        stop
+      end if
+
+!####################### get attributes of input netcdf file ############################
+      call ncinq(idnci,ndims,nvars,ngatts,irecd,ier)
+      write(6,'("ndims,nvars,ngatts,irecd,ier")')
+      write(6,'(5i6)') ndims,nvars,ngatts,irecd,ier
+
+c Get dimensions
+      write(6,*) "get dim1 idnci=",idnci
+c turn OFF fatal netcdf errors
+      call ncpopt(0)
+      lonid = ncdid(idnci,'lon',ier)
+      write(6,*)"lon idnci,lonid,ier=",idnci,lonid,ier
+c turn on fatal netcdf errors
+c     write(6,*)"NCVERBOS,NCFATAL=",NCVERBOS,NCFATAL
+c     call ncpopt(NCVERBOS+NCFATAL)
+
+      if ( ier.eq.0 ) then
+        write(6,*)"idnci,lonid=",idnci,lonid
+        ier= nf_inq_dimlen(idnci,lonid,ix)
+        write(6,*)"input ix,ier=",ix,ier
+        latid= ncdid(idnci,'lat',ier)
+        ier= nf_inq_dimlen(idnci,latid,iy)
+        write(6,*)"input iy,ier=",iy,ier
+        allocate(glon(ix),glat(iy))
+        ier = nf_inq_varid(idnci,'lon',idv)
+! get glon from input dataset
+        ier = nf_get_var_real(idnci,idv,glon)
+        ier = nf_inq_varid(idnci,'lat',idv)
+        ier = nf_get_var_real(idnci,idv,glat)
+      else
+        write(6,*)"now try longitude"
+        lonid = ncdid(idnci,'longitude',ier)
+        write(6,*)"lonid=",lonid," ier=",ier
+        ier= nf_inq_dimlen(idnci,lonid,ix)
+        write(6,*)"input ix=",ix," ier=",ier
+        latid= ncdid(idnci,'latitude',ier)
+        ier= nf_inq_dimlen(idnci,latid,iy)
+        write(6,*)"input iy=",iy
+        allocate(glon(ix),glat(iy))
+        ier = nf_inq_varid(idnci,'longitude',idv)
+        ier = nf_get_var_real(idnci,idv,glon)
+        write(6,*)"glon=",(glon(i),i=1,ix)
+        ier = nf_inq_varid(idnci,'latitude',idv)
+        ier = nf_get_var_real(idnci,idv,glat)
+        write(6,*)"glat=",(glat(i),i=1,iy)
+
+      endif ! ( ier .eq. 0 ) then
+
+! find min/max  for input data set
+      slon = glon(1)
+      elon = glon(ix)
+      slat = glat(1)
+      elat = glat(iy)
+      write(6,*)"==================> slon=",slon," elon=",elon," ix=",ix
+      write(6,*)"==================> slat=",slat," elat=",elat," iy=",iy
+
+      write(6,*)"allocate datan ix,iy=",ix,iy
+      allocate(datan(ix*iy))
+      !write(6,*)"allocate lsm_gbl ix,iy=",ix,iy
+      !allocate(lsm_gbl(ix*iy))
+
+      ier = nf_inq_dimid(idnci,'time',idnt)
+      write(6,*)"ier=",ier," idnt=",idnt
+
+!########## get number of times in input netcdf file ###########
+
+      ier= nf_inq_dimlen(idnci,idnt,narch)
+      write(6,*)"ier=",ier," narch=",narch
+      narch=min(narch,ntimes)
+
+      ier = nf_inq_varid(idnci,'time',ivtim)
+      write(6,*)"ier=",ier," ivtim=",ivtim
+
+      ier = nf_get_att_text(idnci,ivtim,'units',timorg) ! MJT quick fix
+      write(6,*)"ier=",ier," units (timorg)=",timorg
+
+      if (ier.eq.0) then
+        ie=index(timorg,'since')
+      else
+        timorg='hours'
+        ie=0
+      end if
+
+      write(6,*)"ie=",ie
+
+      if (ie.ne.0) then
+        i=scan(timorg,' ')-1
+        cu=''
+        cu(1:i)=timorg(1:i)
+        write(6,*)"cu=",cu
+        timorg(1:19)=timorg(i+8:i+26)
+        write(6,*)"timorg=",timorg
+        i1=scan(timorg,'-')-1
+        write(6,*)"i1=",i1
+        i2=scan(timorg(i1+2:19),'-')-1
+        write(6,*)"i2=",i2
+        read(timorg(1:i1),*) iyr
+        write(6,*)"iyr=",iyr
+        read(timorg(i1+2:i1+2+i2-1),*) imn
+        write(6,*)"imn=",imn
+        read(timorg(i1+2+i2+2:i1+2+i2+2+1),*) idy
+        write(6,*)"idy=",idy
+        i=scan(timorg,' ')-1
+        write(6,*)"i=",i
+        if ( i+3 .le. ie ) then
+          read(timorg(i+2:i+3),*) ihr
+        else
+          ihr=0
+        endif
+        write(6,*)"ihr=",ihr
+        if ( i+6 .le. ie ) then
+          read(timorg(i+5:i+6),*) imi 
+        else
+          imi=0
+        endif
+        write(6,*)"imi=",imi
+      else
+        cu=timorg
+        ier = nf_get_att_text(idnci,ivtim,'time_origin',timorg)
+        write(6,*)"ier=",ier," time_origin=",timorg
+        if (ier.eq.0) then
+          read(timorg,'(i2)') idy
+          read(timorg,'(3x,a3)') cmonth
+          write(6,*)"cmonth=",cmonth
+          imn = icmonth_to_imn(cmonth)
+          write(6,*)"imn=",imn
+          read(timorg,'(9x,i2)') iyr
+          read(timorg,'(12x,i2)') ihr
+          read(timorg,'(15x,i2)') imi
+        else
+          cu="days"
+          imi=0
+          ihr=0
+          iyr=0
+          imn=1
+          idy=1
+        endif
+      end if
+
+!     if ( iyr .lt. 10 ) iyr = iyr+2000
+!     if ( iyr .lt. 100 ) iyr = iyr+1900
+
+      write(6,'("iyr,imn,idy,ihr,imi=",5i4)')iyr,imn,idy,ihr,imi
+
+      do j=1,iy
+       do i=1,ix
+         datan(i+(j-1)*ix     )=glon(i)
+         !datan(i+(j-1)*ix+ix*iy)=glat(j)
+       enddo ! i
+      enddo ! j
+
+
+! printout of glon
+      do j=1,iy,iy-1
+        do i=1,ix,ix-1
+          write(6,*)i,j,datan(i+(j-1)*ix)
+        enddo
+      enddo
+
+       call prt_pan(rlong,il,jl,2,'rlong')
+       call prt_pan(rlat ,il,jl,2,'rlat')
+
+      write(6,*)"============= sintp16 clon++++++++++++++++++++++++++++"
+      write(6,*)"ix,iy,sdiag,il=",ix,iy,sdiag,il
+      call sintp16(datan(1:ix*iy),ix,iy,clon,glon,glat,sdiag,il)
+
+      call prt_pan(clon,il,jl,2,'clon')
+
+      do j=1,iy
+       do i=1,ix
+         datan(i+(j-1)*ix)=glat(j)
+       enddo ! i
+      enddo ! j
+
+! printout of glat
+      do j=1,iy,iy-1
+        do i=1,ix,ix-1
+          write(6,*)i,j,datan(i+(j-1)*ix)
+        enddo
+      enddo
+
+      write(6,*)"============= sintp16 clat++++++++++++++++++++++++++++"
+      call sintp16(datan(1:ix*iy),ix,iy,clat,glon,glat,
+     &             sdiag,il)
+
+      call prt_pan(clat,il,jl,2,'clat pan2')
+
+      write(6,'("ix,iy,narch=",4i5)')ix,iy,narch
+
+      write(6,*)"++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+
+      write(6,*)' reading variables sarch,narch=',sarch,narch
+
+c***********************************************************************
+      do iarch=sarch,narch
+       ntau=iarch-sarch+1
+c***********************************************************************
+
+       sdiag=.false.
+
+       ier = nf_inq_varid(idnci,'time',ivtim)
+       ier = nf_get_var1_real(idnci,ivtim,iarch,rdays)
+
+       write(6,*)"#### iarch,ntau,rdays,cu=",iarch,ntau,rdays,cu
+      
+       !convert rdays to minutes
+       select case(cu) ! MJT quick fix
+        case('days')
+           mtimer=rdays*24.*60. ! to convert days to minutes
+      	case('hours')
+           mtimer=rdays*60. ! to convert hours to minutes 
+ 	case('minutes')
+          ! no change	
+          mtimer=rdays
+ 	case('seconds')
+          mtimer=rdays/60.
+	case DEFAULT
+	  write(6,*) "cannot convert unknown time unit ",trim(cu)
+	  stop
+       end select
+
+       write(6,*)"mtimer=",mtimer
+
+       write(6,*)"===========================",namein , idnci
+
+       ier = nf_inq_varid(idnci,namein,idvar)
+       write(6,*)"ier=",ier," idvar=",idvar
+       if ( ier .ne. 0 ) then
+         write(6,*)"ier=",ier," idvar=",idvar
+         stop
+       endif
+
+       write(6,*)"input data has ",namein," data, now read in gbl"
+       write(6,*)"ix,iy=",ix,iy,addoff,sfactor
+
+!!!!!!!!!! here we need to loop over data to do land and ovean values
+!!! need to use datan values to determine land/sea mask
+
+       do lsmloop=1,1
+
+       write(6,*)"read in netcdf data for whole globe  lsmloop=",lsmloop
+       call ncread_2d(idnci,iarch,idvar,ix,iy
+     &               ,addoff,sfactor,datan(1:ix*iy))
+
+       call amap ( datan(1:ix*iy), ix, iy, namein//"_gbl", 0., 0. )
+
+       spval=-1.e10
+       write(6,*)"spval=",spval
+       write(6,*)"datmin,datmax=",datmin,datmax
+
+       write(6,*)"set any NAN to spval"
+       if (any(isnan(datan(1:ix*iy)))) then
+	  where (isnan(datan(1:ix*iy)))
+	    datan(1:ix*iy)=spval
+          else where (datan(1:ix*iy).gt.datmax)
+            datan(1:ix*iy)=spval
+          else where (datan(1:ix*iy).lt.datmin)
+            datan(1:ix*iy)=spval
+	  end where
+       endif
+
+       write(6,*)"set any values greater than datmax to spval"
+       if (any(datan(1:ix*iy).gt.datmax)) then
+	  write(6,*) "Missing data found in ",namein
+	  where (datan(1:ix*iy).gt.datmax)
+	    datan(1:ix*iy)=spval
+	  end where
+       end if
+
+       write(6,*)"set any values less than datmin to spval"
+       if (any(datan(1:ix*iy).lt.datmin)) then
+	  write(6,*) "Missing data found in ",namein
+	  where (datan(1:ix*iy).lt.datmin)
+	    datan(1:ix*iy)=spval
+	  end where
+       end if
+
+       call amap ( datan(1:ix*iy), ix, iy, namein//"_fgbl", 0., 0. )
+
+!      write(6,*)"create lsm mask from spvals in input dataset"
+! lsm_gbl(1) = 0 over ocean
+! lsm_gbl(1) = 1 over land
+! lsm_gbl(1*ix*iy) = 1 over ocean
+! lsm_gbl(1*ix*iy) = 0 over land
+!      nlpnts=0
+!      nopnts=0
+!      do iq=1,ix*iy
+!        if ( datan(iq) .lt. .1*spval)then
+!          olsm_gbl=.true.
+!          lsm_gbl(iq)=.true. ! land
+!          nlpnts=nlpnts+1
+!        else
+!          lsm_gbl(iq)=.false. ! ocean
+!          nopnts=nopnts+1
+!        endif
+!      enddo
+
+!      write(6,*)"lsm_gbl ocn  ids,ide,jds,jde=",ids,ide,jds,jde
+!      write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+!      do j=jde,jds,-1
+!         write(6,'(i4,30l5)')j,(lsm_gbl(i+(j-1)*ix),i=ids,ide)
+!      enddo
+
+       write(6,*)"input datan"
+       write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+       do j=jde,jds,-1
+          write(6,'(i4,30f5.0)')j,(datan(i+(j-1)*ix),i=ids,ide)
+       enddo
+
+       write(6,*)"fill in missing values in datan spval=",.1*spval
+
+       if ( ifill.eq.2 )then
+         call fillj(datan,ix,iy,.1*spval,
+     &            datan)
+       elseif ( ifill.eq.3 )then
+! first fill ocean values over land for two iterations
+         call fill(datan,ix,iy,.1*spval,
+     &            datan,-1)
+       else
+! first fill ocean values over land for abs(ifill) iterations
+         call fill(datan,ix,iy,.1*spval,
+     &            datan,abs(ifill))
+! now fill in rest of land with zonal mean ocean values
+         call fillzonal(datan,ix,iy,.1*spval,
+     &            datan)
+! finally fill any remaining missing values
+         call fill(datan,ix,iy,.1*spval,
+     &            datan,maxit)
+       endif
+
+       if ( lsmloop .eq. 1 ) then
+         call amap(datan, ix, iy, namein//"_ogbl", 0., 0.)
+       else
+         call amap(datan,ix,iy,namein//"_lgbl",0.,0.)
+       endif
+
+       write(6,*)"postfill datan"
+       write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+       do j=jde,jds,-1
+          write(6,'(i4,30f5.0)')j,(datan(i+(j-1)*ix),i=ids,ide)
+       enddo
+
+       call amap ( datan(1:ix*iy), ix, iy, namein//'_gblfill', 0., 0. )
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       write(6,*)"###################### do we have olsm_gbl=",olsm_gbl
+       if ( olsm_gbl ) then
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       ijgd=igd+ix*(jgd-1)
+       write(6,*)"igd,jgd,ijgd=",igd,jgd,ijgd
+       ijd=id+il*(jd-1)
+       write(6,*)"id,jd,ijd=",id,jd,ijd
+
+       write(6,*)"prepare to interp. tss for sea and land separately"
+       write(6,*)"igd,jgd,gtss=",igd,jgd,datan(ijgd)
+       write(6,*)"putting only land values into datan"
+       write(6,*)"putting only ocean values into datan(+ix*iy)"
+!not done since tss already at sea level     write(6,*)"First: reduce tss to sea level"
+
+       if ( nlpnts.eq.0 .and. nopnts.eq.0 ) then
+         nlpnts=ix*iy
+       endif
+       write(6,*)"fill in missing values nlpnts,nopnts=",nlpnts,nopnts
+
+! now interpolate land values to model grid
+! this uses the pre: fill/fillzonal/fill data 
+       call sintp16(datan(1:ix*iy),ix,iy,ovar,glon,glat,
+     &                  sdiag,il)   ! land
+
+! Now for ocean values
+! smooth land points
+
+       if(nopnts.gt.0)then
+
+         write(6,*)"presmooth opnts"
+         write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+         do j=jde,jds,-1
+          write(6,'(i4,30f5.0)')j,(datan(i+(j-1)*ix+ix*iy),i=ids,ide)
+         enddo
+
+         write(6,*)"smooth lsm_gbl"
+         write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+         do j=jde,jds,-1
+          write(6,'(i4,30f5.0)')j,(lsm_gbl(i+(j-1)*ix+ix*iy),i=ids,ide)
+         enddo
+
+         if(nsmooth.gt.0)then
+           write(6,*)"smooth filled gbl land before using for lakes"
+           call smooth(datan(1+ix*iy:2*ix*iy),ix,iy,.5,
+     &        datan(1+2*ix*iy:3*ix*iy),nsmooth,lsm_gbl(1+ix*iy:2*ix*iy))
+           write(6,*)"postsmooth opnts"
+           write(6,'("glbl",30f5.0)')(real(i),i=ids,ide)
+           do j=jde,jds,-1
+            write(6,'(i4,30f5.0)')j,(datan(i+(j-1)*ix+ix*iy),i=ids,ide)
+           enddo
+         endif ! nsmooth
+
+         write(6,*)"igd,jgd,ogtss=",igd,jgd,datan(ijgd+ix*iy)
+         write(6,*)"=========================> now interp. ocean data"
+
+! now interpolate ocean values to model grid
+         call sintp16(datan(1+ix*iy:2*ix*iy),ix,iy,var_m,glon,glat,
+     &                  sdiag,il)   ! ocean
+
+         write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+         do j=jccs,jcce,-1
+          write(6,'(i4,30f5.0)')j,(var_m(i+(j-1)*il),i=iccs,icce)
+         enddo
+
+       endif!(nopnts.gt.0)then
+
+       call prt_pan(ovar  ,il,jl,2,'tss')
+       call prt_pan(var_m,il,jl,2,'tsso')
+
+       write(6,*)"id,jd,ltss=",id,jd,ovar(ijd)
+       write(6,*)"id,jd,otss=",id,jd,var_m(ijd)
+
+       write(6,*)"now recombine two (land/ocean) fields"
+
+       do j=1,jl
+           do i=1,il
+            iq=i+(j-1)*il
+!not done since tss already at sea level  ovar(i,j)=ovar(i,j)-zs(iq)*.0065
+!not done since tss already at sea level  varl_m(i,j)=varl_m(i,j)-zs(iq)*.0065
+! remember, land < .5 is an ocean point
+            if ( lsm_m(iq) .lt. .5 ) then
+               ovar(iq)=var_m(iq)  ! set to ocean interp pnt
+            endif
+           enddo ! i
+       enddo ! j
+
+       write(6,*)"final sst on model grid"
+       write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+       do j=jccs,jcce,-1
+          write(6,'(i4,30f5.0)')j,(ovar(i+(j-1)*il),i=iccs,icce)
+       enddo
+
+       write(6,*)"final lsm on model grid"
+       write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+       do j=jccs,jcce,-1
+          write(6,'(i4,30f5.0)')j,(lsm_m(i+(j-1)*il),i=iccs,icce)
+       enddo
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       else!(olsm_gbl)then
+!!!!!!!!!!!!!!no gbl land sea mask used
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+         write(6,*)"=========================> now interp. data"
+         call sintp16(datan,ix,iy,ovar,glon,glat,sdiag,il)
+
+         call fill(ovar,il,jl,.1*spval,datan,maxit)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       endif!(olsm_gbl)then
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       enddo
+
+       write(6,*)"id,jd,ovar=",id,jd,ovar(ijd)
+
+       write(6,*)" findxn model ovar"
+       call findxn(ovar,ifull,-1.e29,xa,kx,an,kn)
+
+       call prt_pan(ovar,il,jl,2,nameout)
+
+       i=il/2
+       j=jl/2
+       iq=il/2+(jl/2-1)*il
+       write(6,'("ovar=",f12.2)') ovar(iq)
+
+      write(6,*)"call outcdf with nameout,varun,ihr,idy,imn,iyr,ntau
+     &          ,mtimer,ofile,ds,il="
+
+      write(6,*)nameout,varun,ihr,idy,imn,iyr,ntau,mtimer,ofile,ds,il
+
+      call outcdf(nameout,varun,ihr,idy,imn,iyr,ntau,mtimer,ofile,ds,il)
+
+      write(6,*)"done outcdf"
+
+!#######################################################################
+      enddo ! do ntau=1,narch
+!#######################################################################
+
+      deallocate(datan)
+      deallocate(glon,glat)
+
+      write(6,*)'*********** Finished one ************************'
+      
+      deallocate(x,y,z,ax,ay,az,bx,by,bz)
+      deallocate(var_m,lsmg_m)
+      deallocate(zsg)
+
+      write(6,*)"call latlongdealloc"
+      call latlongdealloc      
+      write(6,*)"call clldealloc"
+      call clldealloc
+      write(6,*)"call sigdatadealloc"
+      call sigdatadealloc
+
+      write(6,*)"idnci,idnco=",idnci,idnco
+      ieri= nf_close(idnci)
+      iero= nf_close(idnco)
+      write(6,*)"ieri,iero=",ieri,iero
+
+      stop
+      end ! one
+c***************************************************************************
+      subroutine ncread_2d(idhist,ntau,idvar,il,jl,addoff,sfactor,var)
+
+!     include 'gblparm.h'
+!     include 'netcdf.inc'
+      use netcdf_m
+
+      integer start(4),count(4),ndims,dimid(4)
+
+      real var(il*jl)
+      real addoff, sfactor
+      integer*1 iao
+
+      integer*2, dimension(:), allocatable :: ivar
+      real*8, dimension(:), allocatable :: dvar
+      integer*1, dimension(:), allocatable :: bvar
+
+      character*30 name
+      character*10 dimname
+
+      write(6,*)"==========================> ncread_2d idhist=",idhist
+      write(6,*)"ntau=",ntau," idvar=",idvar
+      write(6,*)"il=",il," jl=",jl
+      write(6,*)"addoff=",addoff," sfactor=",sfactor
+
+c read name
+      ier = nf_inq_varname(idhist,idvar,name)
+      write(6,*)"ier=",ier," name=",name
+
+      if(ier.eq.0)then
+! have valid variable
+
+!       if(il*jl.gt.nnx*nny)stop "ncread_2d il*jl.gt.nnx*nny"
+
+        start(1) = 1
+        start(2) = 1
+        start(3) = ntau
+        count(1) = il
+        count(2) = jl
+        count(3) = 1
+
+        write(6,'("start=",4i6)') start
+        write(6,'("count=",4i6)') count
+
+        ier = nf_inq_varndims(idhist,idvar,ndims)
+        ier = nf_inq_vardimid(idhist,idvar,dimid)
+
+        write(6,*) ndims,dimid
+        do i=1,ndims
+          ier = nf_inq_dimname(idhist,dimid(i),dimname)
+          ier = nf_inq_dimlen(idhist,dimid(i),j)
+          count(i)=1
+          start(i)=1
+          if ( dimname .eq. 'lon' .or. dimname .eq. 'longitude' ) then 
+            start(i)=1
+            count(i)=j
+          endif
+          if ( dimname .eq. 'lat' .or. dimname .eq. 'latitude' ) then 
+            start(i)=1
+            count(i)=j
+          endif
+          if ( dimname .eq. 'time' ) then 
+            start(i)=ntau
+            count(i)=1
+          endif
+          write(6,*)i,dimname,start(i),count(i)
+        enddo
+
+        ier = nf_inq_vartype(idhist,idvar,itype)
+        write(6,*)"itype=",itype," ier=",ier
+        write(6,*)"nf_short=",nf_short," nf_float=",nf_float
+     &      ," nf_double=",nf_double," nf_byte=",nf_byte
+
+!### short ##########
+        if ( itype .eq. nf_short ) then
+           write(6,*)"variable is short"
+           allocate(ivar(il*jl))
+           call ncvgt(idhist,idvar,start,count,ivar,ier)
+           write(6,*)"ivar(1)=",ivar(1)," ier=",ier
+           write(6,*)"ivar(il*jl)=",ivar(il*jl)
+        else if ( itype .eq. nf_float ) then
+           write(6,*)"variable is float"
+           call ncvgt(idhist,idvar,start,count,var,ier)
+           write(6,*)"var(1)=",var(1)," ier=",ier
+           write(6,*)"var(il*jl)=",var(il*jl)
+        else if ( itype .eq. nf_double ) then
+           write(6,*)"variable is double"
+           allocate(dvar(il*jl))
+           ier=nf_get_vara_double(idhist,idvar,start,count,dvar)
+           var=dvar
+           write(6,*)"var(1)=",var(1)," ier=",ier
+           write(6,*)"var(il*jl)=",var(il*jl)
+        else if ( itype .eq. nf_byte ) then
+           write(6,*)"variable is byte"
+           allocate(bvar(il*jl))
+           write(6,*)"idhist,idvar=",idhist,idvar
+           write(6,*)start
+           write(6,*)count
+           ier=nf_get_vara_int1(idhist,idvar,start,count,bvar)
+           write(6,*)"ier=",ier
+           bmax=-1.e29
+           bmin=+1.e29
+           do j=start(2),count(2)
+           do i=start(1),count(1)
+             iq=i+(j-1)*count(1)
+             bmax=max(bmax,real(bvar(iq)))
+             bmin=min(bmin,real(bvar(iq)))
+           enddo
+           enddo
+           write(6,*)"bmax,min=",bmax,bmin
+           var=real(bvar)
+           write(6,*)"var(1)=",var(1)," ier=",ier
+           write(6,*)"var(il*jl)=",var(il*jl)
+        else
+           write(6,*)"variable is unknown"
+           stop
+        endif
+
+      write(6,*)"addoff=",addoff," sfactor=",sfactor
+
+      ier=NF_INQ_ATTTYPE(idhist,idvar,'add_offset',xtype)
+      write(6,*)"add_offset xtype=",xtype,ier
+      ier=NF_INQ_ATTTYPE(idhist,idvar,'scale_factor',xtype)
+      write(6,*)"scale_factor xtype=",xtype,ier
+
+c obtain scaling factors and offsets from attributes
+      if ( addoff .lt. -1.e28 ) then
+        write(6,*)"call ncagt(idhist,idvar,'add_offset',addoff,ier)"
+        if ( itype.eq.nf_byte) then
+          ier = nf_get_att_int1(idhist,idvar,'add_offset',iao)
+          addoff=real(iao)
+        else
+          ier = nf_get_att_real(idhist,idvar,'add_offset',addoff)
+        endif
+        write(6,*)"idhist,idvar,addoff,ier="
+        write(6,*)idhist,idvar,addoff,ier
+        if ( ier.ne.0 ) addoff=0.
+      endif
+      write(6,*)"ier=",ier," addoff=",addoff
+
+      write(6,*)"sfactor=",sfactor
+      if ( sfactor .lt. -1.e28 ) then
+        write(6,*)"call ncagt(idhist,idvar,'scale_factor',sfactor,ier)"
+!       if ( itype.eq.nf_byte) then
+!         ier = nf_get_att_int1(idhist,idvar,'scale_factor',iao)
+!          write(6,*)"iao=",iao
+!         sfactor=real(iao)
+!       else
+          ier = nf_get_att_real(idhist,idvar,'scale_factor',sfactor)
+!       endif
+        write(6,*)"idhist,idvar,sfactor,ier="
+        write(6,*)idhist,idvar,sfactor,ier
+        if ( ier.ne.0 ) sfactor=1.
+      endif
+      write(6,*)"ier=",ier," sfactor=",sfactor
+
+      else!(ier.eq.0)then
+        write(6,*)"########################### no data found ########"
+        write(6,*)"############setting data to zero #################"
+        do i=1,il*jl
+         var(i)=0
+        enddo
+        sfactor=0.
+        addoff=0.
+      endif!(ier.eq.0)then
+
+c unpack data
+      dx=-1.e29
+      dn= 1.e29
+      do j=1,jl
+        do i=1,il
+          ij=i+(j-1)*il
+      	  if ( itype .eq. nf_short ) then
+            if(i.eq.1.and.j.eq.1)
+     &        write(6,*)"ivar,sfactor,addoff=",ivar(ij),sfactor,addoff
+           var(ij) = ivar(ij)*sfactor + addoff
+          else
+            if(i.eq.1.and.j.eq.1)
+     &         write(6,*)"var,sfactor,addoff=",var(ij),sfactor,addoff
+            var(ij) = var(ij)*sfactor + addoff
+          endif
+          dx=max(dx,var(ij))
+          dn=min(dn,var(ij))
+        end do
+      end do
+
+      write(6,*)"ncread_2d idvar=",idvar," ntau=",ntau
+      write(6,*)"ncread_2d dx=",dx," dn=",dn
+
+      if ( itype .eq. nf_short ) then
+        deallocate(ivar)
+      else if ( itype .eq. nf_double ) then
+        deallocate(dvar)
+      else if ( itype .eq. nf_byte ) then
+        deallocate(bvar)
+      endif
+
+      return ! ncread_2d
+      end
+c***************************************************************************
+      subroutine filt_nc(var,il,jl,kl)
+
+      real var(il,jl,kl)
+
+      write(6,*) "not used filt_nc"
+
+!     do k=1,kl
+!      do j=1,jl
+!       do i=1,il
+!         var(i,j,k) = var(i,j,k)
+!       end do
+!      end do
+!     end do
+
+      return ! filt_nc
+      end
+!***********************************************************************
+      function icmonth_to_imn(cmonth)
+
+      integer icmonth_to_imn
+      character*(*) cmonth
+
+      write(6,*)"icmonth_to_imn cmonth=",cmonth
+
+      icmonth_to_imn=0
+      if ( cmonth.eq.'jan' ) icmonth_to_imn=1
+      if ( cmonth.eq.'feb' ) icmonth_to_imn=2
+      if ( cmonth.eq.'mar' ) icmonth_to_imn=3
+      if ( cmonth.eq.'apr' ) icmonth_to_imn=4
+      if ( cmonth.eq.'may' ) icmonth_to_imn=5
+      if ( cmonth.eq.'jun' ) icmonth_to_imn=6
+      if ( cmonth.eq.'jul' ) icmonth_to_imn=7
+      if ( cmonth.eq.'aug' ) icmonth_to_imn=8
+      if ( cmonth.eq.'sep' ) icmonth_to_imn=9
+      if ( cmonth.eq.'oct' ) icmonth_to_imn=10
+      if ( cmonth.eq.'nov' ) icmonth_to_imn=11
+      if ( cmonth.eq.'dec' ) icmonth_to_imn=12
+
+      write(6,*)"icmonth_to_imn=",icmonth_to_imn
+
+      return 
+      end
+!***********************************************************************
