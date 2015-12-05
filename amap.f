@@ -47,7 +47,6 @@ c-----------------------------------------------------------------------
            nmax = n
         endif
    45 continue
-      write(6,*)"max,min=",wmax,wmin
 c-----------------------------------------------------------------------
 c change contour interval if number of contours > 40 or < 2
 c or calculate contour interval if zero was specified
@@ -60,9 +59,6 @@ c-----------------------------------------------------------------------
       else
          cint = ( wmax - wmin ) / 10.
       endif
-      if ( wmax.eq.wmin ) then
-        cint=1.0
-      endif
 c-----------------------------------------------------------------------
 c print heading with label, max, min, cint, and base
 c-----------------------------------------------------------------------
@@ -70,19 +66,19 @@ c-----------------------------------------------------------------------
          if ( max(wmax,abs(wmin)).ge.c1e5
      .        .or. min(wmax,abs(wmin)).lt.c1) then
             write(6,1) label, wmax, nmax, wmin, nmin, cint, base
-    1       format('amap ',a32,/,' max=',1p,e10.2,' at',i10,' min='
-     .           ,e10.2,' at',i10,' cint=',e10.2,' base=',e10.2)
+    1       format(1h0,a32,/,' max=',1p,e10.2,' at',i6,' min='
+     .           ,e10.2,' at',i6,' cint=',e10.2,' base=',e10.2)
          else
             write(6,2) label, wmax, nmax, wmin, nmin, cint, base
-    2       format('amap ',a32,/,' max=',f10.2,' at',i10,' min='
-     .           ,f10.2,' at',i10,' cint=',f10.2,' base=',f10.2)
+    2       format(1h0,a32,/,' max=',f10.2,' at',i6,' min='
+     .           ,f10.2,' at',i6,' cint=',f10.2,' base=',f10.2)
          endif
       else
 c-----------------------------------------------------------------------
 c have a constant field
          write(6,3) label, wmax, nmax, wmin, nmin, cint, base
-    3    format('amapc ',a32,/,' max=',f10.2,' at',i10,' min=',f10.2
-     .           ,' at',i10,' cint=',f10.2,' base=',f10.2)
+    3    format(1h0,a32,/,' max=',f10.2,' at',i6,' min=',f10.2
+     .           ,' at',i6,' cint=',f10.2,' base=',f10.2)
          return
       endif
 c-----------------------------------------------------------------------

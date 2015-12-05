@@ -1,5 +1,5 @@
       subroutine outcdf(nameout,varun,ihr,idy,imon,iyr,iarch,mtimer
-     &                 ,ofile,ds,il)
+     &                 ,ofile,ds,il,lnleap)
      
       integer il,jl,ifull
 
@@ -16,7 +16,7 @@
       include 'netcdf.inc'
       character ofile*(*)
       character nameout*(*),varun*(*)
-
+      logical lnleap
       include 'cdfind.h'
 
       integer dim(4)
@@ -68,6 +68,7 @@ c Create dimensions, lon, lat
         xdim = ncddef(idnco, 'longitude', il, ier)
         ydim = ncddef(idnco, 'latitude', jl, ier)
         tdim = ncddef(idnco, 'time',ncunlim,ier)
+        zdim = 0
         write(6,*) "xdim=",xdim," ydim=",ydim
      &           ," zdim=",zdim," tdim=",tdim
 
@@ -85,6 +86,7 @@ c define coords.
         write(6,*)'idnt=',idnt
         call ncaptc(idnco,idnt,'point_spacing',NCCHAR,4,'even',ier)
 
+        ktau = 1
         write(6,*)'kdate,ktime,ktau=',kdate,ktime,ktau
 
         icy=kdate/10000
@@ -103,7 +105,9 @@ c define coords.
      &       2(i2.2,":"),i2.2)') icy,icm,icd,ich,icmi,ics
         write(6,*)'grdtim=',grdtim
         call ncaptc(idnco,idnt,'units',NCCHAR,33,grdtim,ier)
-
+        if (lnleap) then
+        call ncaptc(idnco,idnt,'calendar',NCCHAR,6,'noleap',ier)
+        endif ! add noleap in case of 365_day calendar
         dim(1) = xdim
         dim(2) = ydim
         dim(3) = zdim
@@ -152,8 +156,6 @@ c create the attributes of the header record of the file
       call openhist(idnco,iarch,dim,nameout,varun
      &             ,kdate,ktime,mtimer,il,1)
 
-      write(6,*)"done openhist"
-
       call ncsnc(idnco,ier)
       if(ier.ne.0)write(6,*)"ncsnc idnco,ier=",idnco,ier
 
@@ -174,7 +176,7 @@ c this routine creates attributes and writes output
       include 'netcdf.inc'
       include 'cdfind.h'
 
-      character lname*50,expdesc*50
+      character lname*50,expdesc*50,sstver*12
       character nameout*60,varun*60
       integer dim(4)
       integer idim2(3)
@@ -185,6 +187,8 @@ c this routine creates attributes and writes output
 !       *** qscrn_ave not presently written     
       real aa(6*il*il),bb(6*il*il),cc(6*il*il)
       real cfrac(6*il*il,kl)
+      real dummy(size(lsm_m))
+      
 
       jl=6*il
       ifull=il*jl
@@ -213,6 +217,10 @@ c       Experiment description
         expdesc = 'CCAM model run'
         call ncaptc(idnc,ncglobal,'expdesc',ncchar,50,expdesc,ier)
         write(6,*)"expdesc=",expdesc," ier=",ier
+c       SST version
+        sstver = 'Version2'
+        call ncaptc(idnc,ncglobal,'sstver',ncchar,50,sstver,ier)
+        write(6,*)"expdesc=",sstver," ier=",ier
 
         lname = 'year-month-day at start of run'
         idkdate = ncvdef(idnc,'kdate',nclong,1,dim(4),ier)
@@ -258,7 +266,7 @@ c       For time invariant surface fields
         call attrib(idnc,idim2,2,'clat',lname,'none',-90.,90.)
 
 c       For time varying surface fields
-        call attrib(idnc,idim2,3,nameout,nameout,varun,-999.,999.)
+        call attrib(idnc,idim2,3,nameout,nameout,varun,999.,-999.)
 
         write(6,*)'finished defining attributes'
 c       Leave define mode
@@ -298,6 +306,8 @@ c       Leave define mode
       ktau=0
       timer=mtimer/60 ! time in hours
       timeg=mod(mtimer/60,24) ! MJT quick fix
+      time = 0
+      mtimeg = 0
       write(6,*)'outcdf processing kdate,ktime,ktau,time,mtimer: ',
      .                           kdate,ktime,ktau,time,mtimer
       write(6,*)'outcdf processing timer,timeg: ',
@@ -332,11 +342,13 @@ c     set time to number of minutes since start
         call histwrt3(clat,'clat',idnc,-1,il)
       endif ! (ktau.eq.0) 
 
+      is=0
       write(6,*)"zs(m)=",(zs(is+i),i=1,5)
       call prt_pan(zs,il,jl,2,'zs(m)')
 
       call histwrt3(zs,'zs',idnc,-1,il)   ! always from 13/9/02
-      call histwrt3(lsm_m*65.e3,'lsm',idnc,-1,il)
+      dummy = lsm_m*65.e3
+      call histwrt3(dummy,'lsm',idnc,-1,il)
 
       call histwrt3(ovar,nameout,idnc,iarch,il)
 
@@ -348,7 +360,7 @@ c=======================================================================
       include 'netcdf.inc'
 
       integer*2 minv, maxv, missval   ! was integer*2
-      parameter(minv = -32499, maxv = 32500, missval = -32500)
+      parameter(minv = -32500, maxv = 32500, missval = -32501)
       integer cdfid, idv, dim(3)
       character name*(*), lname*(*), units*(*)
       real xmin, xmax
@@ -403,7 +415,7 @@ c Write 2d+t fields from the savegrid array.
       character* (*) sname
 c     character*8 sname
       integer*2 minv, maxv, missval ! was integer*2 
-      parameter(minv = -32499, maxv = 32500, missval = -32500)
+      parameter(minv = -32500, maxv = 32500, missval = -32501)
 
       real var(il,6*il)
 
@@ -411,10 +423,10 @@ c     character*8 sname
 
       jl=6*il
       ifull=il*jl
+      kl = 1
 
       write(6,*)"histwrt3 sname=",sname," iarch=",iarch," idnc=",idnc
       write(6,*)"il,jl,kl,ifull",il,jl,kl,ifull
-
       if ( iarch .gt. 0 ) then
         allocate(start(3),count(3))
         start(1) = 1
@@ -431,20 +443,14 @@ c     character*8 sname
         count(2) = jl
       endif
 
-      write(6,*)"start=",start
-      write(6,*)"count=",count
-
 c find variable index
       idvar = ncvid(idnc,sname,ier)
       call ncagt(idnc,idvar,'add_offset',addoff,ier)
       call ncagt(idnc,idvar,'scale_factor',scale_f,ier)
 
-      write(6,*) 'add_offset=',addoff,' scale_factor=',scale_f
-
       xmin=addoff+scale_f*minv
 !     xmax=xmin+scale_f*float(maxv-minv)
       xmax=xmin+scale_f*(real(maxv)-real(minv)) ! jlm fix for precision problems
-      write(6,*) "xmin=",xmin," xmax=",xmax
 
       varn= 1.e29
       varx=-1.e29
@@ -467,8 +473,6 @@ c find variable index
           endif
 	end do
       end do
-
-      write(6,*)"pvar=",pvar
 
       if(xmin.lt.xmax)then
         call ncvpt(idnc, idvar, start, count, ipack, ier)
@@ -497,7 +501,7 @@ c Write 3d+t fields from the savegrid array.
       character* (*) sname
 c     character*8 sname
       integer*2 minv, maxv, missval ! was integer*2 
-      parameter(minv = -32499, maxv = 32500, missval = -32500)
+      parameter(minv = -32500, maxv = 32500, missval = -32501)
 
       real var(il,6*il,kl)
 
