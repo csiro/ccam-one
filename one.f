@@ -5,28 +5,52 @@
       use latlong_m
       use sigdata_m
 
+      implicit none
+
       character*80 inf,zsfil,ofile
 
       common/mapproj/du,tanl,rnml,stl1,stl2
 
       include 'netcdf.inc'
 
+      real pi, g, ds, du, tanl
+      real rnml, stl1, stl2
       parameter ( pi=3.1415926536 )
       parameter ( g=9.80616 )
       
       include 'cdfind.h'
 
       integer  il,jl,kl,ifull,ix,iy
+      integer inzs, io_out, igd, jgd
+      integer id, jd, ntimes, in, ids, ide
+      integer jds, jde, iccs, icce, jccs, jcce
       integer, dimension(2) :: ccdim
       
-      logical netcdf_zsfil
+      logical netcdf_zsfil, debug, idv
       integer ierr, ncid, varid
+      integer sarch, nsmooth, ifill
+      integer ilx, jlx, i, j, iq, ijd
+      integer ier, ndims, nvars, ngatts
+      integer irecd, lonid, latid
+      integer ilatx, ilonx, ilatn, ilonn
+      integer narch, ivtim, iarch
+      integer ntau, idvar
+      integer i1, i2, iyr, imn, idy, ihr, imi
+      integer ipval, nlpnts, nopnts
+      integer ijgd, kx, ieri, iero, kn
+      integer mtimer
+      integer icmonth_to_imn
       integer, dimension(3) :: spos, npos
 
+      real ther
       common/lconther/ther
       logical sdiag
 
       real dst
+      real rlong0, rlat0, schmidt
+      real rlatx, rlatn, rlonx, rlonn
+      real elon, elat, rdays
+      real spval, xa, an
       real, dimension(2) :: lonlat
       real, dimension(:,:,:), allocatable :: rlld,xyz,axyz,bxyz      
       real, dimension(:,:), allocatable :: grid
@@ -43,6 +67,7 @@
       character*1 in_type
 
       logical olsm_gbl,lnleap
+      logical calout
       character*60 timorg
       character*60 namein,nameout,varun,calendar
       character*60 cu

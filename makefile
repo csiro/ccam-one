@@ -1,9 +1,16 @@
-SHELL=/bin/sh
-
 CMP = ifort
 FFLAGS = -O -fpp -check all -debug all -fpe0 -traceback
 INC = -I $(NETCDF_ROOT)/include/ 
 LIBS = -L $(NETCDF_ROOT)/lib -lnetcdf -lnetcdff
+PPFLAG90 = -fpp
+PPFLAG77 = -fpp
+
+ifeq ($(GFORTRAN),yes)
+CMP = gfortran
+FFLAGS = -O2 -mtune=native -march=native
+PPFLAG90 = -x f95-cpp-input
+PPFLAG77 = -x f77-cpp-input
+endif
 
 OBJ2= findxn.o filt.o sintp16.o \
 	one.o amap.o lconset.o \
@@ -21,9 +28,9 @@ clean:
 
 .SUFFIXES:.f90
 .f.o:
-	$(CMP) -c $(FFLAGS) $(INC) $<
+	$(CMP) -c $(FFLAGS) $(INC) $(PPFLAG77) $<
 .f90.o:
-	$(CMP) -c $(FFLAGS) $(INC) $<
+	$(CMP) -c $(FFLAGS) $(INC) $(PPFLAG95) $<
 %.o : %.mod
 
 one.o sintp16.o setxyz.o: latlong_m.o
