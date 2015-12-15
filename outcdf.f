@@ -446,13 +446,18 @@ c     character*8 sname
 c find variable index
       idvar = ncvid(idnc,sname,ier)
       call ncagt(idnc,idvar,'add_offset',addoff,ier)
-      if (ier/=0) addoff=0.
       call ncagt(idnc,idvar,'scale_factor',scale_f,ier)
-      if (ier/=0) scale_f=1.
 
-      xmin=addoff+scale_f*minv
-!     xmax=xmin+scale_f*float(maxv-minv)
-      xmax=xmin+scale_f*(real(maxv)-real(minv)) ! jlm fix for precision problems
+      if (ier==0) then
+        xmin=addoff+scale_f*minv
+!       xmax=xmin+scale_f*float(maxv-minv)
+        xmax=xmin+scale_f*(real(maxv)-real(minv)) ! jlm fix for precision problems
+      else
+        xmax=-1000.
+        xmin=1000.
+        scale_f=1.
+        addoff=0.
+      end if
 
       varn= 1.e29
       varx=-1.e29
