@@ -446,7 +446,9 @@ c     character*8 sname
 c find variable index
       idvar = ncvid(idnc,sname,ier)
       call ncagt(idnc,idvar,'add_offset',addoff,ier)
+      if (ier/=0) addoff=0.
       call ncagt(idnc,idvar,'scale_factor',scale_f,ier)
+      if (ier/=0) scale_f=1.
 
       xmin=addoff+scale_f*minv
 !     xmax=xmin+scale_f*float(maxv-minv)
