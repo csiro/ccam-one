@@ -494,15 +494,17 @@ c***********************************************************************
 	    datan(1:ix*iy)=spval
           else where (datan(1:ix*iy).gt.400.)
             datan(1:ix*iy)=spval
+	  else where ( datan(1:ix*iy).lt.-400.)
+	    datan(1:ix*iy)=spval
 	  end where
        endif
 
-       if (any(datan(1:ix*iy).gt.400.)) then
-	  write(6,*) "Missing data found in ",namein
-	  where (datan(1:ix*iy).gt.400.)
-	    datan(1:ix*iy)=spval
-	  end where
-       end if
+!       if (any(datan(1:ix*iy).gt.400.)) then
+!	  write(6,*) "Missing data found in ",namein
+!	  where (datan(1:ix*iy).gt.400.)
+!	    datan(1:ix*iy)=spval
+!	  end where
+!       end if
 
 ! create lsm mask from spvals in input dataset
 ! lsm_gbl(1) = 0 over ocean
@@ -724,13 +726,16 @@ c***********************************************************************
 c***************************************************************************
       subroutine ncread_2d(idhist,ntau,idvar,il,jl,var)
 
+      implicit none
 !     include 'gblparm.h'
       include 'netcdf.inc'
 
-      integer, intent(in) :: idhist
+      integer, intent(in) :: idhist, ntau, il, jl
       integer start(3),count(3)
+      integer ier, itype, idvar, i, j, ij
 
       real var(il*jl), addoff, sf
+      real dx, dn
 
       integer*2, dimension(:), allocatable :: ivar
       real*8, dimension(:), allocatable :: dvar
@@ -757,8 +762,8 @@ c read name
         count(2) = jl
         count(3) = 1
 
-        write(6,'("start=",4i4)') start
-        write(6,'("count=",4i4)') count
+        write(6,'("start=",3i4)') start
+        write(6,'("count=",3i4)') count
 
         ier = nf_inq_vartype(idhist,idvar,itype)
         write(6,*)"itype=",itype," ier=",ier

@@ -1,4 +1,4 @@
-CMP = ifort
+FC = ifort
 FFLAGS = -O -fpp -check all -debug all -fpe0 -traceback
 INC = -I $(NETCDF_ROOT)/include/ 
 LIBS = -L $(NETCDF_ROOT)/lib -lnetcdf -lnetcdff
@@ -6,7 +6,7 @@ PPFLAG90 = -fpp
 PPFLAG77 = -fpp
 
 ifeq ($(GFORTRAN),yes)
-CMP = gfortran
+FC = gfortran
 FFLAGS = -O2 -mtune=native -march=native
 PPFLAG90 = -x f95-cpp-input
 PPFLAG77 = -x f77-cpp-input
@@ -21,16 +21,16 @@ OBJ2= findxn.o filt.o sintp16.o \
 	latlong_m.o cll_m.o sigdata_m.o smooth.o fillzonal.o fillj.o
 
 one : $(OBJ2)
-	$(CMP) $(FFLAGS) $(OBJ2) $(LIBS) -o one
+	$(FC) $(FFLAGS) $(OBJ2) $(LIBS) -o one
 
 clean:
 	rm -f *.o core one *.mod
 
 .SUFFIXES:.f90
 .f.o:
-	$(CMP) -c $(FFLAGS) $(INC) $(PPFLAG77) $<
+	$(FC) -c $(FFLAGS) $(INC) $(PPFLAG77) $<
 .f90.o:
-	$(CMP) -c $(FFLAGS) $(INC) $(PPFLAG95) $<
+	$(FC) -c $(FFLAGS) $(INC) $(PPFLAG95) $<
 %.o : %.mod
 
 one.o sintp16.o setxyz.o: latlong_m.o
