@@ -480,7 +480,7 @@ c***********************************************************************
 
        call ncread_2d(idnci,iarch,idvar,ix,iy,datan(1:ix*iy))
 
-       call amap ( datan(1:ix*iy), ix, iy, namein//"_gbl", 0., 0. )
+       !call amap ( datan(1:ix*iy), ix, iy, namein//"_gbl", 0., 0. )
 
        spval=-1.e10
        write(6,*)"spval=",spval
@@ -629,10 +629,10 @@ c***********************************************************************
          call sintp16(datan(1+ix*iy:2*ix*iy),ix,iy,var_m,glon,glat,
      &                  sdiag,il)   ! ocean
 
-         write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
-         do j=jccs,jcce,-1
-          write(6,'(i4,30f5.0)')j,(var_m(i+(j-1)*il),i=iccs,icce)
-         enddo
+         !write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+         !do j=jccs,jcce,-1
+         ! write(6,'(i4,30f5.0)')j,(var_m(i+(j-1)*il),i=iccs,icce)
+         !enddo
 
        endif!(nopnts.gt.0)then
 
@@ -658,16 +658,16 @@ c***********************************************************************
        enddo ! j
 
        write(6,*)"final sst on model grid"
-       write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
-       do j=jccs,jcce,-1
-          write(6,'(i4,30f5.0)')j,(ovar(i+(j-1)*il),i=iccs,icce)
-       enddo
+       !write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+       !do j=jccs,jcce,-1
+       !   write(6,'(i4,30f5.0)')j,(ovar(i+(j-1)*il),i=iccs,icce)
+       !enddo
 
        write(6,*)"final lsm on model grid"
-       write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
-       do j=jccs,jcce,-1
-          write(6,'(i4,30f5.0)')j,(lsm_m(i+(j-1)*il),i=iccs,icce)
-       enddo
+       !write(6,'("ccam",30f5.0)')(real(i),i=iccs,icce)
+       !do j=jccs,jcce,-1
+       !   write(6,'(i4,30f5.0)')j,(lsm_m(i+(j-1)*il),i=iccs,icce)
+       !enddo
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        else!(olsm_gbl)then
@@ -799,7 +799,7 @@ c obtain scaling factors and offsets from attributes
 
         call ncagt(idhist,idvar,'scale_factor',sf,ier)
         if ( ier.ne.0 ) sf=1.
-        write(6,*)"ier=",ier," addoff=",addoff
+        write(6,*)"ier=",ier," scale_factor=",sf
 
       else!(ier.eq.0)then
 c no data found
@@ -816,7 +816,7 @@ c unpack data
       do j=1,jl
         do i=1,il
           ij=i+(j-1)*il
-      	  if ( itype .eq. nf_short ) then
+          if ( itype .eq. nf_short ) then
            if(i.eq.1.and.j.eq.1)
      &      write(6,*)"ivar,sf,addoff=",ivar(ij),sf,addoff
             var(ij) = ivar(ij)*sf + addoff

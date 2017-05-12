@@ -1,5 +1,5 @@
 FC = ifort
-FFLAGS = -O -fpp -check all -debug all -fpe0 -traceback
+FFLAGS = -O -fpp -traceback
 INC = -I $(NETCDF_ROOT)/include/ 
 LIBS = -L $(NETCDF_ROOT)/lib -lnetcdf -lnetcdff
 PPFLAG90 = -fpp
