@@ -492,12 +492,14 @@ c***********************************************************************
        if (any(isnan(datan(1:ix*iy)))) then
 	  where (isnan(datan(1:ix*iy)))
 	    datan(1:ix*iy)=spval
-          else where (datan(1:ix*iy).gt.400.)
-            datan(1:ix*iy)=spval
-	  else where ( datan(1:ix*iy).lt.-400.)
-	    datan(1:ix*iy)=spval
-	  end where
+	  end where  
        endif
+       
+       where (datan(1:ix*iy).gt.400.)
+         datan(1:ix*iy)=spval
+       else where ( datan(1:ix*iy).lt.-400.)
+         datan(1:ix*iy)=spval
+       end where
 
 !       if (any(datan(1:ix*iy).gt.400.)) then
 !	  write(6,*) "Missing data found in ",namein
