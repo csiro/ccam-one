@@ -368,7 +368,7 @@ c     call ncpopt(NCVERBOS+NCFATAL)
         write(6,*)iyr
         read(timorg(i1+2:i1+2+i2-1),*) imn
         write(6,*)imn
-        read(timorg(i1+2+i2+2:i1+2+i2+2+1),*) idy
+        read(timorg(i1+2+i2+1:i1+2+i2+2),*) idy
         write(6,*)idy
         i=scan(timorg,' ')-1
         write(6,*)i
