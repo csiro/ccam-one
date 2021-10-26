@@ -116,21 +116,21 @@
       write(6,*)'open ',inzs,' zsfil=',zsfil
 
         write(6,*)"set up cc geometry"
-	
-	ierr = nf_open(zsfil,nf_nowrite,ncid)
-	netcdf_zsfil = ( ierr==0 )
-	if ( netcdf_zsfil ) then
-	  ierr=nf_get_att_real(ncid,nf_global,'lon0',rlong0)
+
+        ierr = nf_open(zsfil,nf_nowrite,ncid)
+        netcdf_zsfil = ( ierr==0 )
+        if ( netcdf_zsfil ) then
+          ierr=nf_get_att_real(ncid,nf_global,'lon0',rlong0)
           ierr=nf_get_att_real(ncid,nf_global,'lat0',rlat0)
-	  ierr=nf_get_att_real(ncid,nf_global,'schmidt',schmidt)
-	  ierr=nf_inq_dimid(ncid,'longitude',varid)
-	  ierr=nf_inq_dimlen(ncid,varid,ilx)
-	  ierr=nf_inq_dimid(ncid,'latitude',varid)
-	  ierr=nf_inq_dimlen(ncid,varid,jlx)
-	else
+          ierr=nf_get_att_real(ncid,nf_global,'schmidt',schmidt)
+          ierr=nf_inq_dimid(ncid,'longitude',varid)
+          ierr=nf_inq_dimlen(ncid,varid,ilx)
+          ierr=nf_inq_dimid(ncid,'latitude',varid)
+          ierr=nf_inq_dimlen(ncid,varid,jlx)
+        else
           open(unit=inzs,file=zsfil,status='old',form='formatted')
           read(inzs,*)ilx,jlx,rlong0,rlat0,schmidt,ds,header
-	end if
+        end if
         du=rlong0
         tanl=rlat0
         rnml=schmidt
@@ -220,9 +220,9 @@ c       used in sintp16; N.B. original rlong is -pi to pi
       write(6,*)'read model grid zsg = g*zs'
       if ( netcdf_zsfil ) then
         spos(1:3) = 1
-	npos(1) = il
-	npos(2) = jl
-	npos(3) = 1
+        npos(1) = il
+        npos(2) = jl
+        npos(3) = 1
         ierr=nf_inq_varid(ncid,'zs',varid)
         ierr=nf_get_vara_real(ncid,varid,spos,npos,zsi_m)
       else
@@ -237,9 +237,9 @@ c       used in sintp16; N.B. original rlong is -pi to pi
       write(6,*)'read model grid land-sea mask (0=ocean, 1=land)'
       if ( netcdf_zsfil ) then
         spos(1:3) = 1
-	npos(1) = il
-	npos(2) = jl
-	npos(3) = 1
+        npos(1) = il
+        npos(2) = jl
+        npos(3) = 1
         ierr=nf_inq_varid(ncid,'lsm',varid)
         ierr=nf_get_vara_real(ncid,varid,spos,npos,lsm_m)
         ierr=nf_close(ncid)
@@ -293,19 +293,43 @@ c     call ncpopt(NCVERBOS+NCFATAL)
       else
         write(6,*)"now try longitude"
         lonid = ncdid(idnci,'longitude',ier)
-        write(6,*)"lonid=",lonid," ier=",ier
-        ier= nf_inq_dimlen(idnci,lonid,ix)
-        write(6,*)"input ix=",ix," ier=",ier
-        latid= ncdid(idnci,'latitude',ier)
-        ier= nf_inq_dimlen(idnci,latid,iy)
-        write(6,*)"input iy=",iy
-        allocate(glon(ix),glat(iy))
-        ier = nf_inq_varid(idnci,'longitude',idv)
-        ier = nf_get_var_real(idnci,idv,glon)
-        write(6,*)"glon=",(glon(i),i=1,ix)
-        ier = nf_inq_varid(idnci,'latitude',idv)
-        ier = nf_get_var_real(idnci,idv,glat)
-        write(6,*)"glat=",(glat(i),i=1,iy)
+        if ( ier==0 ) then
+          write(6,*)"lonid=",lonid," ier=",ier
+          ier= nf_inq_dimlen(idnci,lonid,ix)
+          write(6,*)"input ix=",ix," ier=",ier
+          latid= ncdid(idnci,'latitude',ier)
+          ier= nf_inq_dimlen(idnci,latid,iy)
+          write(6,*)"input iy=",iy
+          allocate(glon(ix),glat(iy))
+          ier = nf_inq_varid(idnci,'longitude',idv)
+          ier = nf_get_var_real(idnci,idv,glon)
+          write(6,*)"glon=",(glon(i),i=1,ix)
+          ier = nf_inq_varid(idnci,'latitude',idv)
+          ier = nf_get_var_real(idnci,idv,glat)
+          write(6,*)"glat=",(glat(i),i=1,iy)
+        else
+          write(6,*) "now try xt_ocean"
+          lonid = ncdid(idnci,'xt_ocean',ier)
+          if ( ier==0 ) then
+            write(6,*)"lonid=",lonid," ier=",ier
+            ier= nf_inq_dimlen(idnci,lonid,ix)
+            write(6,*)"input ix=",ix," ier=",ier
+            latid= ncdid(idnci,'yt_ocean',ier)
+            ier= nf_inq_dimlen(idnci,latid,iy)
+            write(6,*)"input iy=",iy
+            allocate(glon(ix),glat(iy))
+            ier = nf_inq_varid(idnci,'xt_ocean',idv)
+            ier = nf_get_var_real(idnci,idv,glon)
+            write(6,*)"glon=",(glon(i),i=1,ix)
+            ier = nf_inq_varid(idnci,'yt_ocean',idv)
+            ier = nf_get_var_real(idnci,idv,glat)
+            write(6,*)"glat=",(glat(i),i=1,iy)
+          else
+            write(6,*) "ERROR: Cannot find valid coordinates in ",
+     &                  trim(inf)
+            stop
+          end if
+        end if
 
       endif ! ( ier .eq. 0 ) then
 
