@@ -7,6 +7,9 @@ LIBS += -lnetcdff
 endif
 INC = -I $(NETCDF_ROOT)/include
 FFLAGS = -O3  -xHost -fp-model precise -traceback
+ifeq ($(ZEN3),yes)
+FFLAGS = -O3 -axCORE-AVX2 -fp-model precise -traceback
+endif
 PPFLAG90 = -fpp
 PPFLAG77 = -fpp
 DEBUGFLAG = -check all -debug all -traceback -fpe0
