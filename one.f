@@ -522,14 +522,14 @@ c***********************************************************************
 ! set any NAN to spval
 ! set any values greater than 400 to spval (if also has NAN somewhere in grid)
        if (any(isnan(datan(1:ix*iy)))) then
-	  where (isnan(datan(1:ix*iy)))
-	    datan(1:ix*iy)=spval
-	  end where  
+         where (isnan(datan(1:ix*iy)))
+           datan(1:ix*iy)=spval
+         end where  
        endif
        
        where (datan(1:ix*iy).gt.400.)
          datan(1:ix*iy)=spval
-       else where ( datan(1:ix*iy).lt.-400.)
+       else where ( datan(1:ix*iy).lt.-40.)
          datan(1:ix*iy)=spval
        end where
 
