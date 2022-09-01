@@ -395,11 +395,19 @@ c     call ncpopt(NCVERBOS+NCFATAL)
         read(timorg(i1+2+i2+1:i1+2+i2+2),*) idy
         write(6,*)idy
         i=scan(timorg,' ')-1
-        write(6,*)i
-        read(timorg(i+2:i+3),*) ihr
-        write(6,*)ihr
-        read(timorg(i+5:i+6),*) imi 
-        write(6,*)imi
+        if ( i>0 .and. i<len_trim(timorg) ) then
+          read(timorg(i+2:i+3),*) ihr
+          write(6,*)ihr
+          read(timorg(i+5:i+6),*) imi 
+          write(6,*)imi
+        else
+          i=scan(timorg,'T')-1
+          write(6,*)i
+          read(timorg(i+2:i+3),*) ihr
+          write(6,*)ihr
+          read(timorg(i+5:i+6),*) imi
+          write(6,*)imi
+        end if 
       else
         cu=timorg
         ier = nf_get_att_text(idnci,ivtim,'time_origin',timorg)
