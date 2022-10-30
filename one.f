@@ -66,13 +66,14 @@
       common/datatype/in_type
       character*1 in_type
 
-      logical olsm_gbl,lnleap
+      logical olsm_gbl
       logical calout
       character*60 timorg
       character*60 namein,nameout,varun,calendar
       character*60 cu
       character*3 cmonth
       character*10 header
+      character*60 lnleap
 
       namelist/gnml/inf,ofile,ds,du,tanl,rnml,stl1,stl2,inzs,zsfil
      &             ,io_out,igd,jgd,id,jd,sarch,ntimes
@@ -99,7 +100,7 @@
    
       slon=0.
       slat=90.
-      lnleap=.false.
+      lnleap=""
       olsm_gbl=.false.
 
 !####################### read namelists ############################
@@ -359,11 +360,12 @@ c     call ncpopt(NCVERBOS+NCFATAL)
 
       ier = nf_get_att_text(idnci,ivtim,'calendar',calendar) ! PH check calendar
       write(6,*)"ier=",ier," calendar=",calendar
-      
-      if (trim(calendar) .eq. '365_day') then
-      lnleap = .true.
-      write(*,*) lnleap
-      endif
+      if ( ier==0 ) then
+        lnleap = calendar
+      else
+        lnleap = "standard"
+      end if
+      write(*,*) "lnleap = ",trim(lnleap)
 
       ier = nf_get_att_text(idnci,ivtim,'units',timorg) ! MJT quick fix
       write(6,*)"ier=",ier," timorg=",timorg
@@ -395,19 +397,11 @@ c     call ncpopt(NCVERBOS+NCFATAL)
         read(timorg(i1+2+i2+1:i1+2+i2+2),*) idy
         write(6,*)idy
         i=scan(timorg,' ')-1
-        if ( i>0 .and. i<len_trim(timorg) ) then
-          read(timorg(i+2:i+3),*) ihr
-          write(6,*)ihr
-          read(timorg(i+5:i+6),*) imi 
-          write(6,*)imi
-        else
-          i=scan(timorg,'T')-1
-          write(6,*)i
-          read(timorg(i+2:i+3),*) ihr
-          write(6,*)ihr
-          read(timorg(i+5:i+6),*) imi
-          write(6,*)imi
-        end if 
+        write(6,*)i
+        read(timorg(i+2:i+3),*) ihr
+        write(6,*)ihr
+        read(timorg(i+5:i+6),*) imi 
+        write(6,*)imi
       else
         cu=timorg
         ier = nf_get_att_text(idnci,ivtim,'time_origin',timorg)
@@ -522,14 +516,14 @@ c***********************************************************************
 ! set any NAN to spval
 ! set any values greater than 400 to spval (if also has NAN somewhere in grid)
        if (any(isnan(datan(1:ix*iy)))) then
-         where (isnan(datan(1:ix*iy)))
-           datan(1:ix*iy)=spval
-         end where  
+	  where (isnan(datan(1:ix*iy)))
+	    datan(1:ix*iy)=spval
+	  end where  
        endif
        
        where (datan(1:ix*iy).gt.400.)
          datan(1:ix*iy)=spval
-       else where ( datan(1:ix*iy).lt.-40.)
+       else where ( datan(1:ix*iy).lt.-400.)
          datan(1:ix*iy)=spval
        end where
 

@@ -16,11 +16,12 @@
       include 'netcdf.inc'
       character ofile*(*)
       character nameout*(*),varun*(*)
-      logical lnleap
+      character lnleap*(*)
       include 'cdfind.h'
 
       integer dim(4)
       integer xdim,ydim,zdim,tdim
+      integer calendar_len
       character timorg*20
       character grdtim*33
       character*3 month(12)
@@ -56,7 +57,7 @@ c#######################################################################
       if ( iarch.eq.1 ) then
         write(6,*)'nccre of ',ofile
 #ifdef usenc4
-	ier=nf_create(ofile,NF_NETCDF4,idnco)
+        ier=nf_create(ofile,NF_NETCDF4,idnco)
 #else
         idnco = nccre(ofile, ncclob, ier)
 #endif
@@ -105,8 +106,12 @@ c define coords.
      &       2(i2.2,":"),i2.2)') icy,icm,icd,ich,icmi,ics
         write(6,*)'grdtim=',grdtim
         call ncaptc(idnco,idnt,'units',NCCHAR,33,grdtim,ier)
-        if (lnleap) then
-        call ncaptc(idnco,idnt,'calendar',NCCHAR,6,'noleap',ier)
+        if (trim(lnleap)=="") then
+          call ncaptc(idnco,idnt,'calendar',NCCHAR,8,'standard',ier)
+        else
+          calendar_len = len_trim(lnleap)
+          call ncaptc(idnco,idnt,'calendar',NCCHAR,calendar_len,
+     &                lnleap,ier)
         endif ! add noleap in case of 365_day calendar
         dim(1) = xdim
         dim(2) = ydim
