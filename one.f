@@ -30,6 +30,7 @@
       integer ierr, ncid, varid
       integer sarch, nsmooth, ifill
       integer ilx, jlx, i, j, iq, ijd
+      integer k
       integer ier, ndims, nvars, ngatts
       integer irecd, lonid, latid
       integer ilatx, ilonx, ilatn, ilonn
@@ -70,6 +71,7 @@
       logical calout
       character*60 timorg
       character*60 namein,nameout,varun,calendar
+      character*60 testname
       character*60 cu
       character*3 cmonth
       character*10 header
@@ -526,6 +528,27 @@ c***********************************************************************
        else where ( datan(1:ix*iy).lt.-400.)
          datan(1:ix*iy)=spval
        end where
+
+       do k = 1,6
+         write(testname,('(A,I1.1)')) "wetfrac",k
+         if ( namein==testname ) then
+           where( datan(1:ix*iy)<1.e-8 )
+             datan(1:ix*iy)=spval
+           end where
+         end if
+         write(testname,('(A,I1.1)')) "wb",k           
+         if ( namein==testname ) then
+           where( datan(1:ix*iy)<1.e-8 )
+             datan(1:ix*iy)=spval
+           end where
+         end if
+         write(testname,('(A,I1.1,A)')) "wb",k,"_ave"           
+         if ( namein==testname ) then
+           where( datan(1:ix*iy)<1.e-8 )
+             datan(1:ix*iy)=spval
+           end where
+         end if
+       end do  
 
 !       if (any(datan(1:ix*iy).gt.400.)) then
 !	  write(6,*) "Missing data found in ",namein
