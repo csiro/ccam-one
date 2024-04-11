@@ -7,7 +7,7 @@
 
       implicit none
 
-      character*80 inf,zsfil,ofile
+      character*1024 inf,zsfil,ofile
 
       common/mapproj/du,tanl,rnml,stl1,stl2
 
@@ -94,7 +94,7 @@
       data sarch/1/,ntimes/999999/
       data debug/.false./,calout/.true./
       data sdiag/.false./
-      data ids/1085/,ide/1100/,jds/520/,jde/590/
+      data ids/1/,ide/1/,jds/1/,jde/1/
 !     data iccs/100/,icce/129/,jccs/760/,jcce/700/ ! west asia
       data iccs/1/,icce/20/,jccs/1090/,jcce/1040/ ! southern GL
 
