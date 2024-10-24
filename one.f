@@ -126,6 +126,10 @@
           ierr=nf_get_att_real(ncid,nf_global,'lon0',rlong0)
           ierr=nf_get_att_real(ncid,nf_global,'lat0',rlat0)
           ierr=nf_get_att_real(ncid,nf_global,'schmidt',schmidt)
+          if ( ierr/=0 ) then
+            write(6,*) "ERROR: Invalid CCAM cubic topography file"
+            stop
+          end if
           ierr=nf_inq_dimid(ncid,'longitude',varid)
           ierr=nf_inq_dimlen(ncid,varid,ilx)
           ierr=nf_inq_dimid(ncid,'latitude',varid)
